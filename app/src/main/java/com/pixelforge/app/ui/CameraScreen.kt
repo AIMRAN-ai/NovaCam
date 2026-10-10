@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pixelforge.app.R
 import com.pixelforge.app.camera.AspectRatio
+import com.pixelforge.app.camera.QualityTier
 import com.pixelforge.app.diagnostics.DiagnosticsState
 import com.pixelforge.app.ui.theme.PixelForgeTheme
 
@@ -154,6 +155,36 @@ fun CameraScreen(
                                 selected = uiState.enhancementEnabled,
                                 onClick = { viewModel.toggleEnhancement() },
                                 label = { Text("Enhancement") },
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                            FilterChip(
+                                selected = uiState.srEnabled,
+                                onClick = { viewModel.setSrEnabled(!uiState.srEnabled) },
+                                label = { Text("Burst SR") },
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            QualityTier.entries.forEach { tier ->
+                                FilterChip(
+                                    selected = uiState.qualityTier == tier,
+                                    onClick = { viewModel.setQualityTier(tier) },
+                                    label = { Text(tier.label) },
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                )
+                            }
+                            FilterChip(
+                                selected = uiState.srScale == 4,
+                                onClick = {
+                                    viewModel.setSrScale(
+                                        if (uiState.srScale == 4) 2 else 4
+                                    )
+                                },
+                                label = { Text(if (uiState.srScale == 4) "4x" else "2x") },
                                 modifier = Modifier.padding(horizontal = 4.dp),
                             )
                         }

@@ -1,6 +1,5 @@
 package com.pixelforge.app.diagnostics
 
-import android.content.Context
 import android.os.Debug
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,12 +19,21 @@ data class DiagnosticsState(
     val coldStartMs: Long? = null,
     val shutterToSaveMs: Long? = null,
     val lastBurst: BurstDiagnostics? = null,
+    val lastPipeline: PipelineDiagnostics? = null,
     val halSummary: String = "not-probed",
     val ramUsedMb: Int = 0,
     val previewFps: Double? = null,
     val previewLatencyMs: Long? = null,
     val enhancementEnabled: Boolean = true,
     val enhancementDegraded: Boolean = false,
+)
+
+data class PipelineDiagnostics(
+    val frames: Int,
+    val tier: String,
+    val scale: Int,
+    val totalMs: Long,
+    val stageTimingsMs: Map<String, Long>,
 )
 
 class Diagnostics {
@@ -43,6 +51,26 @@ class Diagnostics {
 
     fun recordBurst(burst: BurstDiagnostics) {
         _state.update { it.copy(lastBurst = burst) }
+    }
+
+    fun recordBurstPipeline(
+        frames: Int,
+        tier: String,
+        scale: Int,
+        totalMs: Long,
+        stageTimingsMs: Map<String, Long>,
+    ) {
+        _state.update {
+            it.copy(
+                lastPipeline = PipelineDiagnostics(
+                    frames = frames,
+                    tier = tier,
+                    scale = scale,
+                    totalMs = totalMs,
+                    stageTimingsMs = stageTimingsMs,
+                )
+            )
+        }
     }
 
     fun recordHalSummary(summary: String) {
@@ -65,7 +93,7 @@ class Diagnostics {
         _state.update { it.copy(ramUsedMb = mb) }
     }
 
-    fun measureRam(context: Context): Int {
+    fun measureRam(): Int {
         val runtime = Runtime.getRuntime()
         val javaMb = ((runtime.totalMemory() - runtime.freeMemory()) / 1048576L).toInt()
         val nativeMb = (Debug.getNativeHeapAllocatedSize() / 1048576L).toInt()

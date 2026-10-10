@@ -3,6 +3,9 @@ package com.pixelforge.app
 import android.app.Application
 import android.os.SystemClock
 import com.pixelforge.app.diagnostics.Diagnostics
+import com.pixelforge.app.ml.BurstFusionRunner
+import com.pixelforge.app.ml.EsrganLiteRunner
+import com.pixelforge.app.ml.FlowNetRunner
 import com.pixelforge.app.ml.ModelRunner
 import com.pixelforge.app.ml.PlaceholderModelRunner
 import com.pixelforge.app.ml.TfliteModelRunner
@@ -14,6 +17,18 @@ class PixelForgeApp : Application() {
     val coldStartElapsedRealtime: Long = SystemClock.elapsedRealtime()
 
     val modelRunner: ModelRunner by lazy { createModelRunner() }
+
+    val flowNet: FlowNetRunner by lazy {
+        FlowNetRunner(diagnostics, assets)
+    }
+
+    val burstFusion: BurstFusionRunner by lazy {
+        BurstFusionRunner(diagnostics, assets)
+    }
+
+    val esrgan: EsrganLiteRunner by lazy {
+        EsrganLiteRunner(diagnostics, assets)
+    }
 
     private fun createModelRunner(): ModelRunner {
         val assets = assets

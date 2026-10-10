@@ -10,12 +10,14 @@ import androidx.lifecycle.viewModelScope
 import com.pixelforge.app.PixelForgeApp
 import com.pixelforge.app.camera.AspectRatio
 import com.pixelforge.app.camera.BurstOrchestrator
+import com.pixelforge.app.camera.BurstPipeline
 import com.pixelforge.app.camera.BurstResult
 import com.pixelforge.app.camera.Camera2Controller
 import com.pixelforge.app.camera.CameraException
 import com.pixelforge.app.camera.CameraHalProbe
 import com.pixelforge.app.camera.HalCapabilities
 import com.pixelforge.app.camera.PreviewController
+import com.pixelforge.app.camera.QualityTier
 import com.pixelforge.app.camera.ReferenceFrameSink
 import com.pixelforge.app.diagnostics.BurstDiagnostics
 import com.pixelforge.app.diagnostics.Diagnostics
@@ -105,6 +107,18 @@ class CameraViewModel(
         diagnostics.recordEnhancementState(enabled, enhancer.isDegraded)
     }
 
+    fun setSrEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(srEnabled = enabled) }
+    }
+
+    fun setQualityTier(tier: QualityTier) {
+        _uiState.update { it.copy(qualityTier = tier) }
+    }
+
+    fun setSrScale(scale: Int) {
+        _uiState.update { it.copy(srScale = scale.coerceIn(2, 4)) }
+    }
+
     fun onShutter() {
         if (_uiState.value.isCapturing) return
         _uiState.update { it.copy(isCapturing = true) }
@@ -120,6 +134,7 @@ class CameraViewModel(
                 val state = _uiState.value
                 val result: BurstResult
                 val savedUri: Uri?
+                val burstBytes: MutableList<ByteArray> = mutableListOf()
                 if (state.captureMode == CaptureMode.RAW_DNG && capabilities.rawSupported) {
                     val sink = ReferenceFrameSink()
                     result = orchestrator.captureBurst(
@@ -129,6 +144,7 @@ class CameraViewModel(
                         frameSink = sink,
                     )
                     savedUri = captureRaw()
+                    sink.referenceJpeg?.let { burstBytes.add(it) }
                 } else {
                     val sink = ReferenceFrameSink()
                     result = orchestrator.captureBurst(
@@ -140,6 +156,7 @@ class CameraViewModel(
                     savedUri = sink.referenceJpeg?.let { bytes ->
                         saver.saveJpeg(bytes, generateFileName("jpg"))
                     }
+                    sink.referenceJpeg?.let { burstBytes.add(it) }
                 }
                 val shutterToSaveMs = (System.nanoTime() - shutterStart) / 1_000_000L
                 diagnostics.recordShutterToSave(shutterToSaveMs)
@@ -160,6 +177,9 @@ class CameraViewModel(
                         lastError = null,
                     )
                 }
+                if (state.srEnabled && burstBytes.isNotEmpty()) {
+                    launchSrPipeline(burstBytes, state.qualityTier, state.srScale)
+                }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -178,6 +198,47 @@ class CameraViewModel(
         var dngBytes: ByteArray? = null
         controller.captureRawDng { bytes -> dngBytes = bytes }
         return dngBytes?.let { saver.saveRaw(it, generateFileName("dng")) }
+    }
+
+    /**
+     * Runs the Temporal Burst SR pipeline (align -> fuse ->
+     * tone-map -> upscale) after the original file is already
+     * saved, so shutter-to-save stays under the 1.5 s budget.
+     * The enhanced result is saved as a separate JPEG.
+     */
+    private fun launchSrPipeline(
+        burstBytes: List<ByteArray>,
+        tier: QualityTier,
+        scale: Int,
+    ) {
+        viewModelScope.launch {
+            try {
+                val pipeline = BurstPipeline(
+                    diagnostics = diagnostics,
+                    flowNet = app.flowNet,
+                    fusion = app.burstFusion,
+                    esrgan = app.esrgan,
+                )
+                val result = pipeline.process(burstBytes, tier, scale)
+                result.upscaledBitmap?.let { bitmap ->
+                    val jpeg = bitmapToJpeg(bitmap, 92)
+                    val uri = saver.saveJpeg(jpeg, generateFileName("sr.jpg"))
+                    _uiState.update {
+                        it.copy(lastEnhancedUri = uri)
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(lastError = "SR pipeline failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun bitmapToJpeg(bitmap: android.graphics.Bitmap, quality: Int): ByteArray {
+        val stream = java.io.ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, stream)
+        return stream.toByteArray()
     }
 
     private fun rebindPreview() {
@@ -216,6 +277,9 @@ class CameraViewModel(
         previewController.shutdown()
         enhancer.release()
         app.modelRunner.release()
+        app.flowNet.release()
+        app.burstFusion.release()
+        app.esrgan.release()
     }
 
     companion object {
@@ -233,7 +297,11 @@ data class CameraUiState(
     val captureMode: CaptureMode = CaptureMode.BURST_YUV,
     val burstFrames: Int = 8,
     val enhancementEnabled: Boolean = true,
+    val srEnabled: Boolean = true,
+    val qualityTier: QualityTier = QualityTier.FAST,
+    val srScale: Int = 2,
     val isCapturing: Boolean = false,
     val lastSavedUri: Uri? = null,
+    val lastEnhancedUri: Uri? = null,
     val lastError: String? = null,
 )

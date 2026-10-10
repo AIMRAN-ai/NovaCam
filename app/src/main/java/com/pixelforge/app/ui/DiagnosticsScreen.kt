@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pixelforge.app.diagnostics.BurstDiagnostics
 import com.pixelforge.app.diagnostics.DiagnosticsState
+import com.pixelforge.app.diagnostics.PipelineDiagnostics
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,6 +97,9 @@ fun DiagnosticsScreen(
                 diagnosticsState.lastBurst?.let { burst ->
                     BurstSection(burst)
                 }
+                diagnosticsState.lastPipeline?.let { pipeline ->
+                    PipelineSection(pipeline)
+                }
             }
 
             DiagnosticsCard(title = "HAL Capabilities") {
@@ -153,6 +157,25 @@ private fun DiagnosticsCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             content()
+        }
+    }
+}
+
+@Composable
+private fun PipelineSection(pipeline: PipelineDiagnostics) {
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+    LabelValueRow {
+        Label("SR pipeline")
+        Value("${pipeline.frames} frames · ${pipeline.tier} · ${pipeline.scale}x")
+    }
+    LabelValueRow {
+        Label("Total")
+        Value("${pipeline.totalMs} ms")
+    }
+    pipeline.stageTimingsMs.forEach { (stage, ms) ->
+        LabelValueRow {
+            Label("  $stage")
+            Value("${ms} ms")
         }
     }
 }
