@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">PixelForge</string>
+    <string name="shutter_button_desc">Shutter button</string>
+    <string name="enhancement_toggle_desc">Toggle live preview enhancement</string>
+    <string name="diagnostics_button_desc">Open diagnostics</string>
+    <string name="back_button_desc">Back to camera</string>
+    <string name="aspect_ratio_9_16_desc">Aspect ratio 9:16 portrait</string>
+    <string name="aspect_ratio_16_9_desc">Aspect ratio 16:9 landscape</string>
+    <string name="aspect_ratio_1_1_desc">Aspect ratio 1:1 square</string>
+    <string name="burst_frames_desc">Burst frame count</string>
+    <string name="capture_mode_desc">Capture mode</string>
+    <string name="enhanced_preview_desc">Enhanced live preview</string>
+    <string name="camera_permission_rationale">PixelForge needs camera access to capture and enhance photos on-device.</string>
+    <string name="camera_permission_denied">Camera permission is required to use PixelForge.</string>
+    <string name="grant_permission_button">Grant camera permission</string>
+    <string name="capture_error">Capture failed</string>
+    <string name="enhancement_degraded">Enhancement degraded: GPU memory constrained</string>
+    <string name="raw_unavailable">RAW capture not available on this device, using YUV</string>
+</resources>
