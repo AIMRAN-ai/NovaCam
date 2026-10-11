@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "minAppVersion": 1,
+  "models": {
+    "esrgan_lite": {
+      "name": "ESRGAN-Lite",
+      "version": "1.0.0",
+      "sha256": "placeholder_sha256_esrgan",
+      "assetFilename": "esrgan_lite.tflite",
+      "downloadUrl": "https://github.com/AIMRAN-ai/NovaCam/releases/download/models-v1.0.0/esrgan_lite.tflite",
+      "inputShape": [1, 256, 256, 3],
+      "outputShape": [1, 512, 512, 3],
+      "description": "2x/4x Super-resolution, RRDB architecture, int8 quantized"
+    },
+    "flownet_tiny": {
+      "name": "FlowNet-Tiny",
+      "version": "1.0.0",
+      "sha256": "placeholder_sha256_flownet",
+      "assetFilename": "flownet_tiny.tflite",
+      "downloadUrl": "https://github.com/AIMRAN-ai/NovaCam/releases/download/models-v1.0.0/flownet_tiny.tflite",
+      "inputShape": [1, 2, 128, 128, 3],
+      "outputShape": [1, 128, 128, 2],
+      "description": "Optical flow for burst alignment, pruned FlowNet2, int8 quantized"
+    },
+    "burstfusion_net": {
+      "name": "BurstFusion-Net",
+      "version": "1.0.0",
+      "sha256": "placeholder_sha256_burstfusion",
+      "assetFilename": "burstfusion_net.tflite",
+      "downloadUrl": "https://github.com/AIMRAN-ai/NovaCam/releases/download/models-v1.0.0/burstfusion_net.tflite",
+      "inputShape": [1, 5, 256, 256, 3],
+      "outputShape": [1, 256, 256, 3],
+      "description": "5-layer U-Net multi-frame fusion, int8 quantized"
+    },
+    "rife_v4.6": {
+      "name": "RIFE v4.6 (IFNet)",
+      "version": "1.0.0",
+      "sha256": "placeholder_sha256_rife",
+      "assetFilename": "rife_v4.6.tflite",
+      "downloadUrl": "https://github.com/AIMRAN-ai/NovaCam/releases/download/models-v1.0.0/rife_v4.6.tflite",
+      "inputShape": [1, 2, 256, 256, 3],
+      "outputShape": [1, 256, 256, 3],
+      "description": "Frame interpolation (2x/4x), IFNet architecture, int8 quantized"
+    }
+  }
+}

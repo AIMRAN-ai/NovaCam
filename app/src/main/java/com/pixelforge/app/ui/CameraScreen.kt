@@ -49,6 +49,7 @@ import com.pixelforge.app.camera.QualityTier
 import com.pixelforge.app.diagnostics.DiagnosticsState
 import com.pixelforge.app.ui.theme.PixelForgeTheme
 import com.pixelforge.app.video.VideoQualityTier
+import com.pixelforge.app.video.AudioMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +89,22 @@ fun CameraScreen(
                     actions = {
                         OutlinedButton(onClick = onOpenDiagnostics) {
                             Text("Diagnostics")
+                        }
+                        // Share last enhanced video if available
+                        uiState.lastVideoUri?.let { uri ->
+                            OutlinedButton(onClick = {
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                                    .setType("video/*")
+                                    .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share video"))
+                            }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_shutter),
+                                    contentDescription = "Share video",
+                                    tint = Color.White,
+                                )
+                            }
                         }
                     },
                 )
@@ -232,6 +249,30 @@ fun CameraScreen(
                                     label = { Text(tier.label) },
                                     modifier = Modifier.padding(horizontal = 4.dp),
                                 )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        // Audio mode selector (only shown for slow-motion tiers)
+                        if (uiState.videoQualityTier.rifeScale > 1) {
+                            Text(
+                                text = "Audio Mode",
+                                color = Color.White,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, bottom = 4.dp),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                            ) {
+                                AudioMode.entries.forEach { mode ->
+                                    FilterChip(
+                                        selected = uiState.audioMode == mode,
+                                        onClick = { viewModel.setAudioMode(mode) },
+                                        label = { Text(mode.label) },
+                                        modifier = Modifier.padding(horizontal = 4.dp),
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))

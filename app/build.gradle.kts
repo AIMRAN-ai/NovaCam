@@ -92,6 +92,10 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
+    // Audio time-stretch library (Sonic) - requires JitPack repository
+    // Uncomment when JitPack is available in build environment:
+    // implementation("com.github.besherh:sonic-android:1.0.0")
+
     val ffmpegKitEnabled = project.hasProperty("enableFfmpegKit")
     if (ffmpegKitEnabled) {
         implementation("com.arthenica:ffmpeg-kit-full-gpl:6.0")

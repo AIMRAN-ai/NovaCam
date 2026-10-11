@@ -6,6 +6,7 @@ import com.pixelforge.app.diagnostics.Diagnostics
 import com.pixelforge.app.ml.BurstFusionRunner
 import com.pixelforge.app.ml.EsrganLiteRunner
 import com.pixelforge.app.ml.FlowNetRunner
+import com.pixelforge.app.ml.ModelManager
 import com.pixelforge.app.ml.ModelRunner
 import com.pixelforge.app.ml.PlaceholderModelRunner
 import com.pixelforge.app.ml.RifeRunner
@@ -33,6 +34,10 @@ class PixelForgeApp : Application() {
 
     val rife: RifeRunner by lazy {
         RifeRunner(diagnostics, assets)
+    }
+
+    val modelManager: ModelManager by lazy {
+        ModelManager(this, diagnostics)
     }
 
     private fun createModelRunner(): ModelRunner {

@@ -25,7 +25,9 @@ import com.pixelforge.app.io.MediaStoreSaver
 import com.pixelforge.app.ml.PreviewEnhancer
 import com.pixelforge.app.video.VideoCaptureController
 import com.pixelforge.app.video.VideoEnhancementWorker
+import com.pixelforge.app.video.VideoExportConfig
 import com.pixelforge.app.video.VideoQualityTier
+import com.pixelforge.app.video.AudioMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -131,6 +133,10 @@ class CameraViewModel(
         _uiState.update { it.copy(videoQualityTier = tier) }
     }
 
+    fun setAudioMode(mode: AudioMode) {
+        _uiState.update { it.copy(audioMode = mode) }
+    }
+
     fun bindVideoCapture(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
         viewModelScope.launch {
             try {
@@ -203,11 +209,16 @@ class CameraViewModel(
             outputDir,
             generateFileName("enhanced.mp4")
         ).absolutePath
+        val state = _uiState.value
+        val exportConfig = VideoExportConfig(state.videoQualityTier, state.audioMode)
         VideoEnhancementWorker.enqueue(
             context = app.applicationContext,
             inputPath = inputPath,
             outputPath = outputPath,
-            tier = _uiState.value.videoQualityTier,
+            tier = state.videoQualityTier,
+            audioMode = state.audioMode,
+            useHevc = false,
+            exportToGallery = true,
         )
     }
 
@@ -396,6 +407,7 @@ data class CameraUiState(
     val isCapturing: Boolean = false,
     val isRecording: Boolean = false,
     val videoQualityTier: VideoQualityTier = VideoQualityTier.ENHANCED_1080P,
+    val audioMode: AudioMode = AudioMode.STRETCH,
     val lastSavedUri: Uri? = null,
     val lastEnhancedUri: Uri? = null,
     val lastVideoUri: Uri? = null,

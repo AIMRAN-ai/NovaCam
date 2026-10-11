@@ -34,6 +34,7 @@ class MediaCodecFrameSource {
         val durationUs: Long,
         val rotationDegrees: Int,
         val mime: String,
+        val frameRate: Int = 30,
     )
 
     fun probe(path: String): TrackInfo {
@@ -50,7 +51,12 @@ class MediaCodecFrameSource {
                 format.getInteger(MediaFormat.KEY_ROTATION)
             } else 0
             val frameCount = estimateFrameCount(format, durationUs)
-            TrackInfo(width, height, frameCount, durationUs, rotation, "video/avc")
+            val frameRate = when {
+                format.containsKey("frame-rate") -> format.getInteger("frame-rate")
+                format.containsKey(MediaFormat.KEY_FRAME_RATE) -> format.getInteger(MediaFormat.KEY_FRAME_RATE)
+                else -> 30
+            }
+            TrackInfo(width, height, frameCount, durationUs, rotation, "video/avc", frameRate)
         } finally {
             extractor.release()
         }

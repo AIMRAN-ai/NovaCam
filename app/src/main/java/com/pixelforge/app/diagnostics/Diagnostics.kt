@@ -5,6 +5,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
+/**
+ * Thermal degradation level during video enhancement.
+ */
+enum class ThermalDegradation(val label: String) {
+    NONE("None"),
+    DROPPED_RIFE("Dropped RIFE (thermal)"),
+    DROPPED_ESRGAN("Dropped ESRGAN (thermal)"),
+    DROPPED_BOTH("Dropped RIFE+ESRGAN (thermal)"),
+}
+
 data class BurstDiagnostics(
     val framesCaptured: Int,
     val framesRequested: Int,
@@ -34,6 +44,7 @@ data class VideoDiagnosticsState(
     val progress: Float = 0f,
     val lastStats: VideoJobStats? = null,
     val lastError: String? = null,
+    val thermalDegradation: ThermalDegradation = ThermalDegradation.NONE,
 )
 
 data class VideoJobStats(
@@ -43,6 +54,9 @@ data class VideoJobStats(
     val encodeMs: Long,
     val outputSizeBytes: Long,
     val tier: String,
+    val stageTimingsMs: Map<String, Long> = emptyMap(),
+    val delegateUsed: String = "unknown",
+    val thermalDegradation: ThermalDegradation = ThermalDegradation.NONE,
 )
 
 data class PipelineDiagnostics(
@@ -116,6 +130,46 @@ class Diagnostics {
 
     fun recordVideoStats(stats: VideoJobStats) {
         _state.update { it.copy(videoState = it.videoState.copy(lastStats = stats)) }
+    }
+
+    fun recordVideoStats(
+        framesProcessed: Int,
+        totalFrames: Long,
+        throughputFps: Double,
+        encodeMs: Long,
+        outputSizeBytes: Long,
+        tier: String,
+        stageTimingsMs: Map<String, Long> = emptyMap(),
+        delegateUsed: String = "unknown",
+        thermalDegradation: ThermalDegradation = ThermalDegradation.NONE,
+    ) {
+        _state.update {
+            it.copy(
+                videoState = it.videoState.copy(
+                    lastStats = VideoJobStats(
+                        framesProcessed = framesProcessed,
+                        totalFrames = totalFrames,
+                        throughputFps = throughputFps,
+                        encodeMs = encodeMs,
+                        outputSizeBytes = outputSizeBytes,
+                        tier = tier,
+                        stageTimingsMs = stageTimingsMs,
+                        delegateUsed = delegateUsed,
+                        thermalDegradation = thermalDegradation,
+                    )
+                )
+            )
+        }
+    }
+
+    fun recordThermalDegradation(degradation: ThermalDegradation) {
+        _state.update {
+            it.copy(
+                videoState = it.videoState.copy(
+                    lastStats = it.videoState.lastStats?.copy(thermalDegradation = degradation)
+                )
+            )
+        }
     }
 
     fun recordVideoError(error: String) {

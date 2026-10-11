@@ -53,18 +53,25 @@ class VideoEnhancementWorker(
         } catch (e: IllegalArgumentException) {
             VideoQualityTier.ENHANCED_1080P
         }
+        val audioModeName = inputData.getString(KEY_AUDIO_MODE) ?: AudioMode.defaultForRifeScale(tier.rifeScale).name
+        val audioMode = try {
+            AudioMode.valueOf(audioModeName)
+        } catch (e: IllegalArgumentException) {
+            AudioMode.defaultForRifeScale(tier.rifeScale)
+        }
         val useHevc = inputData.getBoolean(KEY_USE_HEVC, false)
+        val exportToGallery = inputData.getBoolean(KEY_EXPORT_GALLERY, true)
 
         val app = applicationContext as? PixelForgeApp
         val srRunner: SrModelRunner = app?.esrgan ?: return Result.failure()
         val rifeRunner: RifeRunner? = app?.rife
 
         val pipeline = VideoUpscalePipeline(applicationContext, diagnostics, srRunner, rifeRunner)
+        val exportConfig = VideoExportConfig(tier, audioMode, useHevc)
         val config = VideoUpscalePipeline.Config(
             inputPath = inputPath,
             outputPath = outputPath,
-            tier = tier,
-            useHevc = useHevc,
+            exportConfig = exportConfig,
         )
 
         var lastProgress = 0
@@ -91,13 +98,22 @@ class VideoEnhancementWorker(
         return try {
             val result = pipeline.run(config)
             job.cancel()
+
+            // Export to gallery if requested
+            var finalUri: String? = null
+            if (exportToGallery) {
+                val galleryExporter = GalleryExporter(applicationContext, diagnostics)
+                val uri = galleryExporter.exportToGallery(result.outputPath)
+                finalUri = uri.toString()
+            }
+
             setForeground(
                 ForegroundInfo(
                     NotificationHelper.NOTIFICATION_ID,
                     NotificationHelper.completeNotification(applicationContext, result.outputPath).build()
                 )
             )
-            Result.success()
+            Result.success(androidx.work.Data.Builder().putString(KEY_RESULT_URI, finalUri).build())
         } catch (e: CancellationException) {
             job.cancel()
             throw e
@@ -112,7 +128,10 @@ class VideoEnhancementWorker(
         const val KEY_INPUT_PATH = "input_path"
         const val KEY_OUTPUT_PATH = "output_path"
         const val KEY_TIER = "tier"
+        const val KEY_AUDIO_MODE = "audio_mode"
         const val KEY_USE_HEVC = "use_hevc"
+        const val KEY_EXPORT_GALLERY = "export_gallery"
+        const val KEY_RESULT_URI = "result_uri"
         const val WORK_TAG = "video_enhancement"
 
         /**
@@ -126,7 +145,9 @@ class VideoEnhancementWorker(
             inputPath: String,
             outputPath: String,
             tier: VideoQualityTier,
+            audioMode: AudioMode? = null,
             useHevc: Boolean = false,
+            exportToGallery: Boolean = true,
             force: Boolean = false,
         ) {
             val constraints = Constraints.Builder()
@@ -138,6 +159,8 @@ class VideoEnhancementWorker(
                 }
                 .build()
 
+            val exportConfig = VideoExportConfig(tier, audioMode ?: AudioMode.defaultForRifeScale(tier.rifeScale), useHevc)
+
             val request = OneTimeWorkRequestBuilder<VideoEnhancementWorker>()
                 .setConstraints(constraints)
                 .setInputData(
@@ -145,7 +168,9 @@ class VideoEnhancementWorker(
                         .putString(KEY_INPUT_PATH, inputPath)
                         .putString(KEY_OUTPUT_PATH, outputPath)
                         .putString(KEY_TIER, tier.name)
+                        .putString(KEY_AUDIO_MODE, exportConfig.audioMode.name)
                         .putBoolean(KEY_USE_HEVC, useHevc)
+                        .putBoolean(KEY_EXPORT_GALLERY, exportToGallery)
                         .build()
                 )
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)

@@ -9,18 +9,17 @@ class VideoUpscalePipelineTest {
 
     @Test
     fun configCreation() {
+        val exportConfig = VideoExportConfig(VideoQualityTier.ENHANCED_1080P, useHevc = true)
         val config = VideoUpscalePipeline.Config(
             inputPath = "/test/input.mp4",
             outputPath = "/test/output.mp4",
-            tier = VideoQualityTier.ENHANCED_1080P,
-            useHevc = true,
-            frameRate = 30,
+            exportConfig = exportConfig,
         )
         assertEquals("/test/input.mp4", config.inputPath)
         assertEquals("/test/output.mp4", config.outputPath)
-        assertEquals(VideoQualityTier.ENHANCED_1080P, config.tier)
-        assertEquals(true, config.useHevc)
-        assertEquals(30, config.frameRate)
+        assertEquals(VideoQualityTier.ENHANCED_1080P, config.exportConfig.tier)
+        assertEquals(true, config.exportConfig.useHevc)
+        assertEquals(30, config.exportConfig.effectiveFrameRate)
     }
 
     @Test
