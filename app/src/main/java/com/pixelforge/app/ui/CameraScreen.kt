@@ -48,6 +48,7 @@ import com.pixelforge.app.camera.AspectRatio
 import com.pixelforge.app.camera.QualityTier
 import com.pixelforge.app.diagnostics.DiagnosticsState
 import com.pixelforge.app.ui.theme.PixelForgeTheme
+import com.pixelforge.app.video.VideoQualityTier
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +73,7 @@ fun CameraScreen(
     LaunchedEffect(Unit) {
         viewModel.retainPreviewReferences(lifecycleOwner, previewView)
         viewModel.attachPreviewView(lifecycleOwner, previewView)
+        viewModel.bindVideoCapture(lifecycleOwner)
     }
 
     PixelForgeTheme {
@@ -188,28 +190,76 @@ fun CameraScreen(
                                 modifier = Modifier.padding(horizontal = 4.dp),
                             )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(72.dp),
-                            contentAlignment = Alignment.Center,
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
                         ) {
-                            Button(
-                                onClick = { viewModel.onShutter() },
-                                enabled = !uiState.isCapturing,
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                ),
-                                modifier = Modifier.size(72.dp),
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_shutter),
-                                    contentDescription = "Shutter button",
-                                    tint = Color.White,
+                            VideoQualityTier.entries.forEach { tier ->
+                                FilterChip(
+                                    selected = uiState.videoQualityTier == tier,
+                                    onClick = { viewModel.setVideoQualityTier(tier) },
+                                    label = { Text(tier.label) },
+                                    modifier = Modifier.padding(horizontal = 4.dp),
                                 )
                             }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(72.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Button(
+                                    onClick = { viewModel.onShutter() },
+                                    enabled = !uiState.isCapturing && !uiState.isRecording,
+                                    shape = CircleShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                    ),
+                                    modifier = Modifier.size(72.dp),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_shutter),
+                                        contentDescription = "Shutter button",
+                                        tint = Color.White,
+                                    )
+                                }
+                                if (uiState.isRecording) {
+                                    Button(
+                                        onClick = { viewModel.stopVideoRecording() },
+                                        shape = CircleShape,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                        ),
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .align(Alignment.CenterEnd),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_shutter),
+                                            contentDescription = "Stop recording",
+                                            tint = Color.White,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (uiState.isRecording) {
+                            Text(
+                                text = "Recording…",
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                textAlign = TextAlign.Center,
+                            )
                         }
                         if (uiState.isCapturing) {
                             Text(

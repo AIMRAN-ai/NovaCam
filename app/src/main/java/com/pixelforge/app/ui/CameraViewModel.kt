@@ -23,6 +23,9 @@ import com.pixelforge.app.diagnostics.BurstDiagnostics
 import com.pixelforge.app.diagnostics.Diagnostics
 import com.pixelforge.app.io.MediaStoreSaver
 import com.pixelforge.app.ml.PreviewEnhancer
+import com.pixelforge.app.video.VideoCaptureController
+import com.pixelforge.app.video.VideoEnhancementWorker
+import com.pixelforge.app.video.VideoQualityTier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +50,11 @@ class CameraViewModel(
         appColdStartElapsedRealtime = { app.coldStartElapsedRealtime },
     )
     private val enhancer = PreviewEnhancer(app.modelRunner, diagnostics)
+    private val videoCaptureController = VideoCaptureController(
+        context = app.applicationContext,
+        diagnostics = diagnostics,
+        saver = saver,
+    )
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
@@ -117,6 +125,90 @@ class CameraViewModel(
 
     fun setSrScale(scale: Int) {
         _uiState.update { it.copy(srScale = scale.coerceIn(2, 4)) }
+    }
+
+    fun setVideoQualityTier(tier: VideoQualityTier) {
+        _uiState.update { it.copy(videoQualityTier = tier) }
+    }
+
+    fun bindVideoCapture(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
+        viewModelScope.launch {
+            try {
+                videoCaptureController.bind(lifecycleOwner)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(lastError = "Video bind failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun startVideoRecording(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
+        if (_uiState.value.isRecording) return
+        _uiState.update { it.copy(isRecording = true) }
+        videoCaptureController.startRecording(lifecycleOwner) { result ->
+            result.fold(
+                onSuccess = { uri ->
+                    _uiState.update {
+                        it.copy(
+                            isRecording = false,
+                            lastVideoUri = uri,
+                            lastError = null,
+                        )
+                    }
+                    val path = uriToPath(uri)
+                    if (path != null && _uiState.value.videoQualityTier != VideoQualityTier.ORIGINAL) {
+                        enqueueVideoEnhancement(path)
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isRecording = false,
+                            lastError = "Recording failed: ${error.message}",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun stopVideoRecording() {
+        videoCaptureController.stopRecording()
+    }
+
+    private fun uriToPath(uri: Uri): String? {
+        return try {
+            val cursor = app.applicationContext.contentResolver.query(
+                uri,
+                arrayOf(android.provider.MediaStore.Video.Media.DATA),
+                null, null, null
+            )
+            cursor?.use {
+                val columnIndex = it.getColumnIndexOrThrow(android.provider.MediaStore.Video.Media.DATA)
+                if (it.moveToFirst()) it.getString(columnIndex) else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun enqueueVideoEnhancement(inputPath: String) {
+        val outputDir = java.io.File(
+            android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DCIM
+            ),
+            "PixelForge"
+        )
+        outputDir.mkdirs()
+        val outputPath = java.io.File(
+            outputDir,
+            generateFileName("enhanced.mp4")
+        ).absolutePath
+        VideoEnhancementWorker.enqueue(
+            context = app.applicationContext,
+            inputPath = inputPath,
+            outputPath = outputPath,
+            tier = _uiState.value.videoQualityTier,
+        )
     }
 
     fun onShutter() {
@@ -275,6 +367,7 @@ class CameraViewModel(
         super.onCleared()
         controller.shutdown()
         previewController.shutdown()
+        videoCaptureController.shutdown()
         enhancer.release()
         app.modelRunner.release()
         app.flowNet.release()
@@ -301,7 +394,10 @@ data class CameraUiState(
     val qualityTier: QualityTier = QualityTier.FAST,
     val srScale: Int = 2,
     val isCapturing: Boolean = false,
+    val isRecording: Boolean = false,
+    val videoQualityTier: VideoQualityTier = VideoQualityTier.ENHANCED_1080P,
     val lastSavedUri: Uri? = null,
     val lastEnhancedUri: Uri? = null,
+    val lastVideoUri: Uri? = null,
     val lastError: String? = null,
 )

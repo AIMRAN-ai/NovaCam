@@ -26,6 +26,23 @@ data class DiagnosticsState(
     val previewLatencyMs: Long? = null,
     val enhancementEnabled: Boolean = true,
     val enhancementDegraded: Boolean = false,
+    val videoState: VideoDiagnosticsState = VideoDiagnosticsState(),
+)
+
+data class VideoDiagnosticsState(
+    val jobState: String = "idle",
+    val progress: Float = 0f,
+    val lastStats: VideoJobStats? = null,
+    val lastError: String? = null,
+)
+
+data class VideoJobStats(
+    val framesProcessed: Int,
+    val totalFrames: Long,
+    val throughputFps: Double,
+    val encodeMs: Long,
+    val outputSizeBytes: Long,
+    val tier: String,
 )
 
 data class PipelineDiagnostics(
@@ -91,6 +108,18 @@ class Diagnostics {
 
     fun recordRam(mb: Int) {
         _state.update { it.copy(ramUsedMb = mb) }
+    }
+
+    fun recordVideoJobState(state: String, progress: Float = 0f) {
+        _state.update { it.copy(videoState = it.videoState.copy(jobState = state, progress = progress)) }
+    }
+
+    fun recordVideoStats(stats: VideoJobStats) {
+        _state.update { it.copy(videoState = it.videoState.copy(lastStats = stats)) }
+    }
+
+    fun recordVideoError(error: String) {
+        _state.update { it.copy(videoState = it.videoState.copy(lastError = error)) }
     }
 
     fun measureRam(): Int {

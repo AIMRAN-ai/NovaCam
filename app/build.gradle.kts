@@ -13,6 +13,19 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0-phase1"
+        buildConfigField("boolean", "ENABLE_FFMPEG_KIT", "false")
+    }
+
+    flavorDimensions += "decoder"
+    productFlavors {
+        create("mediaCodec") {
+            dimension = "decoder"
+            buildConfigField("boolean", "ENABLE_FFMPEG_KIT", "false")
+        }
+        create("ffmpeg") {
+            dimension = "decoder"
+            buildConfigField("boolean", "ENABLE_FFMPEG_KIT", "true")
+        }
     }
 
     buildTypes {
@@ -42,6 +55,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -75,6 +89,13 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    val ffmpegKitEnabled = project.hasProperty("enableFfmpegKit")
+    if (ffmpegKitEnabled) {
+        implementation("com.arthenica:ffmpeg-kit-full-gpl:6.0")
+    }
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.11.1")
