@@ -13,6 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.pixelforge.app.PixelForgeApp
 import com.pixelforge.app.diagnostics.Diagnostics
+import com.pixelforge.app.ml.RifeRunner
 import com.pixelforge.app.ml.SrModelRunner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -56,8 +57,9 @@ class VideoEnhancementWorker(
 
         val app = applicationContext as? PixelForgeApp
         val srRunner: SrModelRunner = app?.esrgan ?: return Result.failure()
+        val rifeRunner: RifeRunner? = app?.rife
 
-        val pipeline = VideoUpscalePipeline(applicationContext, diagnostics, srRunner)
+        val pipeline = VideoUpscalePipeline(applicationContext, diagnostics, srRunner, rifeRunner)
         val config = VideoUpscalePipeline.Config(
             inputPath = inputPath,
             outputPath = outputPath,

@@ -191,11 +191,41 @@ fun CameraScreen(
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Video Quality",
+                            color = Color.White,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, bottom = 4.dp),
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
                         ) {
-                            VideoQualityTier.entries.forEach { tier ->
+                            // Standard tiers
+                            listOf(
+                                VideoQualityTier.ORIGINAL,
+                                VideoQualityTier.ENHANCED_1080P,
+                                VideoQualityTier.ENHANCED_4K,
+                            ).forEach { tier ->
+                                FilterChip(
+                                    selected = uiState.videoQualityTier == tier,
+                                    onClick = { viewModel.setVideoQualityTier(tier) },
+                                    label = { Text(tier.label) },
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            // Slow-motion tiers
+                            listOf(
+                                VideoQualityTier.SMOOTH_60FPS,
+                                VideoQualityTier.SMOOTH_120FPS,
+                            ).forEach { tier ->
                                 FilterChip(
                                     selected = uiState.videoQualityTier == tier,
                                     onClick = { viewModel.setVideoQualityTier(tier) },
@@ -252,8 +282,13 @@ fun CameraScreen(
                             }
                         }
                         if (uiState.isRecording) {
+                            val fpsLabel = when (uiState.videoQualityTier) {
+                                VideoQualityTier.SMOOTH_60FPS -> " @ 60fps"
+                                VideoQualityTier.SMOOTH_120FPS -> " @ 120fps"
+                                else -> ""
+                            }
                             Text(
-                                text = "Recording…",
+                                text = "Recording…$fpsLabel",
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier
                                     .fillMaxWidth()

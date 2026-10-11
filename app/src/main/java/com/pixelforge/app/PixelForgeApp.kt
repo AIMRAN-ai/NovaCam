@@ -8,6 +8,7 @@ import com.pixelforge.app.ml.EsrganLiteRunner
 import com.pixelforge.app.ml.FlowNetRunner
 import com.pixelforge.app.ml.ModelRunner
 import com.pixelforge.app.ml.PlaceholderModelRunner
+import com.pixelforge.app.ml.RifeRunner
 import com.pixelforge.app.ml.TfliteModelRunner
 
 class PixelForgeApp : Application() {
@@ -28,6 +29,10 @@ class PixelForgeApp : Application() {
 
     val esrgan: EsrganLiteRunner by lazy {
         EsrganLiteRunner(diagnostics, assets)
+    }
+
+    val rife: RifeRunner by lazy {
+        RifeRunner(diagnostics, assets)
     }
 
     private fun createModelRunner(): ModelRunner {
