@@ -4,11 +4,13 @@ import android.app.Application
 import android.os.SystemClock
 import com.pixelforge.app.diagnostics.Diagnostics
 import com.pixelforge.app.ml.BurstFusionRunner
+import com.pixelforge.app.ml.DualCameraFusionRunner
 import com.pixelforge.app.ml.EsrganLiteRunner
 import com.pixelforge.app.ml.FlowNetRunner
 import com.pixelforge.app.ml.ModelManager
 import com.pixelforge.app.ml.ModelRunner
 import com.pixelforge.app.ml.PlaceholderModelRunner
+import com.pixelforge.app.ml.PreviewEnhancerLiteRunner
 import com.pixelforge.app.ml.RifeRunner
 import com.pixelforge.app.ml.TfliteModelRunner
 
@@ -34,6 +36,14 @@ class PixelForgeApp : Application() {
 
     val rife: RifeRunner by lazy {
         RifeRunner(diagnostics, assets)
+    }
+
+    val previewEnhancerLite: PreviewEnhancerLiteRunner by lazy {
+        PreviewEnhancerLiteRunner(diagnostics, assets)
+    }
+
+    val dualCameraFusion: DualCameraFusionRunner by lazy {
+        DualCameraFusionRunner(diagnostics, assets)
     }
 
     val modelManager: ModelManager by lazy {

@@ -42,9 +42,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pixelforge.app.R
 import com.pixelforge.app.camera.AspectRatio
+import com.pixelforge.app.ui.CaptureMode
 import com.pixelforge.app.camera.QualityTier
 import com.pixelforge.app.diagnostics.DiagnosticsState
 import com.pixelforge.app.ui.theme.PixelForgeTheme
@@ -146,6 +148,12 @@ fun CameraScreen(
                                 label = { Text("RAW DNG") },
                                 modifier = Modifier.padding(horizontal = 4.dp),
                             )
+                            FilterChip(
+                                selected = uiState.captureMode == CaptureMode.RAW_VIDEO,
+                                onClick = { viewModel.setCaptureMode(CaptureMode.RAW_VIDEO) },
+                                label = { Text("RAW Video") },
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
@@ -180,6 +188,18 @@ fun CameraScreen(
                                 selected = uiState.srEnabled,
                                 onClick = { viewModel.setSrEnabled(!uiState.srEnabled) },
                                 label = { Text("Burst SR") },
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                            FilterChip(
+                                selected = uiState.previewEnhancementEnabled,
+                                onClick = { viewModel.setPreviewEnhancementEnabled(!uiState.previewEnhancementEnabled) },
+                                label = { Text("Live Enhance") },
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                            FilterChip(
+                                selected = uiState.dualCameraEnabled,
+                                onClick = { viewModel.setDualCameraEnabled(!uiState.dualCameraEnabled) },
+                                label = { Text("Dual Cam") },
                                 modifier = Modifier.padding(horizontal = 4.dp),
                             )
                         }
@@ -251,6 +271,25 @@ fun CameraScreen(
                                 )
                             }
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            // HDR tiers
+                            listOf(
+                                VideoQualityTier.HDR_1080P,
+                                VideoQualityTier.HDR_4K,
+                                VideoQualityTier.HDR_SMOOTH_60FPS,
+                            ).forEach { tier ->
+                                FilterChip(
+                                    selected = uiState.videoQualityTier == tier,
+                                    onClick = { viewModel.setVideoQualityTier(tier) },
+                                    label = { Text(tier.label) },
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         // Audio mode selector (only shown for slow-motion tiers)
                         if (uiState.videoQualityTier.rifeScale > 1) {
@@ -276,7 +315,7 @@ fun CameraScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        Row(
+Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically,
@@ -304,7 +343,13 @@ fun CameraScreen(
                                 }
                                 if (uiState.isRecording) {
                                     Button(
-                                        onClick = { viewModel.stopVideoRecording() },
+                                        onClick = {
+                                            when (uiState.captureMode) {
+                                                CaptureMode.RAW_VIDEO -> viewModel.startRawVideoRecording(lifecycleOwner)
+                                                CaptureMode.BURST_YUV -> viewModel.startVideoRecording(lifecycleOwner)
+                                                else -> viewModel.startHdrVideoRecording(lifecycleOwner)
+                                            }
+                                        },
                                         shape = CircleShape,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.error,
@@ -319,6 +364,55 @@ fun CameraScreen(
                                             tint = Color.White,
                                         )
                                     }
+                                } else {
+                                    // Start recording buttons
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly,
+                                    ) {
+                                        // Normal video
+                                        Button(
+                                            onClick = { viewModel.startVideoRecording(lifecycleOwner) },
+                                            enabled = !uiState.isCapturing && !uiState.isRecording,
+                                            shape = CircleShape,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.secondary,
+                                            ),
+                                            modifier = Modifier.size(48.dp),
+                                        ) {
+                                            Text("●", color = Color.White)
+                                        }
+                                        // HDR video (if HDR tier selected)
+                                        if (uiState.videoQualityTier.isHdr) {
+                                            Button(
+                                                onClick = { viewModel.startHdrVideoRecording(lifecycleOwner) },
+                                                enabled = !uiState.isCapturing && !uiState.isRecording,
+                                                shape = CircleShape,
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                                ),
+                                                modifier = Modifier.size(48.dp),
+                                            ) {
+                                                Text("HDR", color = Color.White, fontSize = 10.sp)
+                                            }
+                                        }
+                                        // RAW video
+                                        if (uiState.captureMode == CaptureMode.RAW_VIDEO) {
+                                            Button(
+                                                onClick = { viewModel.startRawVideoRecording(lifecycleOwner) },
+                                                enabled = !uiState.isCapturing && !uiState.isRecording,
+                                                shape = CircleShape,
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                                ),
+                                                modifier = Modifier.size(48.dp),
+                                            ) {
+                                                Text("RAW", color = Color.White, fontSize = 10.sp)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -326,10 +420,12 @@ fun CameraScreen(
                             val fpsLabel = when (uiState.videoQualityTier) {
                                 VideoQualityTier.SMOOTH_60FPS -> " @ 60fps"
                                 VideoQualityTier.SMOOTH_120FPS -> " @ 120fps"
+                                VideoQualityTier.HDR_SMOOTH_60FPS -> " @ 60fps HDR"
                                 else -> ""
                             }
+                            val hdrLabel = if (uiState.videoQualityTier.isHdr) " HDR" else ""
                             Text(
-                                text = "Recording…$fpsLabel",
+                                text = "Recording…$fpsLabel$hdrLabel",
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier
                                     .fillMaxWidth()

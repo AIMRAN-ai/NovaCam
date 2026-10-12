@@ -354,6 +354,10 @@ class VideoUpscalePipeline(
             VideoQualityTier.ENHANCED_4K -> 2
             VideoQualityTier.SMOOTH_60FPS -> 2
             VideoQualityTier.SMOOTH_120FPS -> 2
+            VideoQualityTier.HDR_1080P -> 2
+            VideoQualityTier.HDR_4K -> 2
+            VideoQualityTier.HDR_SMOOTH_60FPS -> 2
+            VideoQualityTier.RAW_VIDEO -> 1
         }
         if (scale == 1) return frame
         return srModelRunner.upscale(frame, scale)

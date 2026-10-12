@@ -15,14 +15,17 @@ import com.pixelforge.app.camera.BurstResult
 import com.pixelforge.app.camera.Camera2Controller
 import com.pixelforge.app.camera.CameraException
 import com.pixelforge.app.camera.CameraHalProbe
+import com.pixelforge.app.camera.DualCameraController
 import com.pixelforge.app.camera.HalCapabilities
 import com.pixelforge.app.camera.PreviewController
 import com.pixelforge.app.camera.QualityTier
+import com.pixelforge.app.camera.RawVideoController
 import com.pixelforge.app.camera.ReferenceFrameSink
 import com.pixelforge.app.diagnostics.BurstDiagnostics
 import com.pixelforge.app.diagnostics.Diagnostics
 import com.pixelforge.app.io.MediaStoreSaver
 import com.pixelforge.app.ml.PreviewEnhancer
+import com.pixelforge.app.video.HdrVideoCaptureController
 import com.pixelforge.app.video.VideoCaptureController
 import com.pixelforge.app.video.VideoEnhancementWorker
 import com.pixelforge.app.video.VideoExportConfig
@@ -57,6 +60,20 @@ class CameraViewModel(
         diagnostics = diagnostics,
         saver = saver,
     )
+    private val hdrVideoController = HdrVideoCaptureController(
+        context = app.applicationContext,
+        diagnostics = diagnostics,
+        saver = saver,
+    )
+    private val dualCameraController = DualCameraController(
+        context = app.applicationContext,
+        diagnostics = diagnostics,
+    )
+    private val rawVideoController = RawVideoController(
+        context = app.applicationContext,
+        diagnostics = diagnostics,
+        saver = saver,
+    )
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
@@ -68,6 +85,8 @@ class CameraViewModel(
     init {
         viewModelScope.launch {
             app.modelRunner.initialize()
+            app.previewEnhancerLite.initialize()
+            app.dualCameraFusion.initialize()
             diagnostics.recordEnhancementState(true, false)
         }
     }
@@ -135,6 +154,96 @@ class CameraViewModel(
 
     fun setAudioMode(mode: AudioMode) {
         _uiState.update { it.copy(audioMode = mode) }
+    }
+
+    fun setPreviewEnhancementEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(previewEnhancementEnabled = enabled) }
+        if (enabled) {
+            viewModelScope.launch {
+                app.previewEnhancerLite.initialize()
+            }
+        }
+    }
+
+    fun setDualCameraEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(dualCameraEnabled = enabled) }
+        if (enabled) {
+            viewModelScope.launch {
+                dualCameraController.configure()
+            }
+        }
+    }
+
+    fun bindHdrVideoCapture(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
+        viewModelScope.launch {
+            try {
+                hdrVideoController.bind(lifecycleOwner)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(lastError = "HDR video bind failed: ${e.message}") }
+            }
+        }
+    }
+
+    fun startHdrVideoRecording(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
+        if (_uiState.value.isRecording) return
+        _uiState.update { it.copy(isRecording = true) }
+        hdrVideoController.startRecording(lifecycleOwner) { result ->
+            result.fold(
+                onSuccess = { uri ->
+                    _uiState.update {
+                        it.copy(
+                            isRecording = false,
+                            lastVideoUri = uri,
+                            lastError = null,
+                        )
+                    }
+                    val path = uriToPath(uri)
+                    if (path != null && _uiState.value.videoQualityTier.isHdr) {
+                        enqueueVideoEnhancement(path)
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isRecording = false,
+                            lastError = "HDR recording failed: ${error.message}",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun startRawVideoRecording(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
+        if (_uiState.value.isRecording) return
+        _uiState.update { it.copy(isRecording = true, captureMode = CaptureMode.RAW_VIDEO) }
+        viewModelScope.launch {
+            try {
+                val configured = rawVideoController.configure()
+                if (!configured) {
+                    _uiState.update { it.copy(isRecording = false, lastError = "RAW video not supported") }
+                    return@launch
+                }
+                val started = rawVideoController.startRecording()
+                if (!started) {
+                    _uiState.update { it.copy(isRecording = false, lastError = "RAW video start failed") }
+                    return@launch
+                }
+                // RAW video runs for max duration, then stops automatically
+                // For now, we'll stop after a delay
+                kotlinx.coroutines.delay(10_000) // 10s max
+                val uris = rawVideoController.stopRecording()
+                _uiState.update {
+                    it.copy(
+                        isRecording = false,
+                        lastVideoUri = uris.firstOrNull(),
+                        lastError = if (uris.isEmpty()) "No frames captured" else null,
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isRecording = false, lastError = "RAW video failed: ${e.message}") }
+            }
+        }
     }
 
     fun bindVideoCapture(lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
@@ -379,11 +488,16 @@ class CameraViewModel(
         controller.shutdown()
         previewController.shutdown()
         videoCaptureController.shutdown()
+        hdrVideoController.shutdown()
+        dualCameraController.shutdown()
+        rawVideoController.shutdown()
         enhancer.release()
         app.modelRunner.release()
         app.flowNet.release()
         app.burstFusion.release()
         app.esrgan.release()
+        app.previewEnhancerLite.release()
+        app.dualCameraFusion.release()
     }
 
     companion object {
@@ -394,6 +508,7 @@ class CameraViewModel(
 enum class CaptureMode {
     BURST_YUV,
     RAW_DNG,
+    RAW_VIDEO,
 }
 
 data class CameraUiState(
@@ -402,6 +517,8 @@ data class CameraUiState(
     val burstFrames: Int = 8,
     val enhancementEnabled: Boolean = true,
     val srEnabled: Boolean = true,
+    val previewEnhancementEnabled: Boolean = false,
+    val dualCameraEnabled: Boolean = false,
     val qualityTier: QualityTier = QualityTier.FAST,
     val srScale: Int = 2,
     val isCapturing: Boolean = false,
