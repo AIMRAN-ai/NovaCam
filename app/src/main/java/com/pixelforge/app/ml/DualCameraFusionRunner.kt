@@ -111,7 +111,11 @@ class DualCameraFusionRunner(
 
     private fun tryCreateGpu(): org.tensorflow.lite.gpu.GpuDelegate? =
         try {
-            org.tensorflow.lite.gpu.GpuDelegate()
+            org.tensorflow.lite.gpu.GpuDelegate(
+                org.tensorflow.lite.gpu.GpuDelegate.Options()
+                    .setInferencePreference(org.tensorflow.lite.gpu.GpuDelegate.Options.INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER)
+                    .setPrecisionLossAllowed(true)
+            )
         } catch (e: Exception) {
             null
         }

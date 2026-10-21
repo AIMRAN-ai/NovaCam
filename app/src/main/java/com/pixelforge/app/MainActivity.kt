@@ -2,6 +2,7 @@ package com.pixelforge.app.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -18,12 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.pixelforge.app.PixelForgeApp
+import com.pixelforge.app.settings.SettingsManager
 import com.pixelforge.app.ui.theme.PixelForgeTheme
 
 class MainActivity : ComponentActivity() {
 
+    private val settingsManager = SettingsManager(this)
+    
     private val viewModel: CameraViewModel by viewModels {
-        CameraViewModelFactory(application as PixelForgeApp)
+        CameraViewModelFactory(application as PixelForgeApp, settingsManager)
     }
 
     private val permissionLauncher = registerForActivityResult(
@@ -57,10 +61,21 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val uiState by viewModel.uiState.collectAsState()
                     val diagnosticsState by viewModel.diagnosticsState.collectAsState()
+                    val editorUri by viewModel.editorUri.collectAsState()
                     CameraScreen(
                         viewModel = viewModel,
                         uiState = uiState,
                         diagnosticsState = diagnosticsState,
+                        editorUri = editorUri,
+                        onOpenDiagnostics = { /* TODO: navigate to diagnostics */ },
+                        onOpenSettings = { /* TODO: navigate to settings */ },
+                        onEditorDone = { uri ->
+                            viewModel.closeEditor()
+                            // Optionally share or show success
+                        },
+                        onEditorCancel = {
+                            viewModel.closeEditor()
+                        },
                     )
                 }
             }

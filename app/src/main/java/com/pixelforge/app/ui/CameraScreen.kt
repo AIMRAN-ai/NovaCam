@@ -49,6 +49,7 @@ import com.pixelforge.app.camera.AspectRatio
 import com.pixelforge.app.ui.CaptureMode
 import com.pixelforge.app.camera.QualityTier
 import com.pixelforge.app.diagnostics.DiagnosticsState
+import com.pixelforge.app.edit.PhotoEditorScreen
 import com.pixelforge.app.ui.theme.PixelForgeTheme
 import com.pixelforge.app.video.VideoQualityTier
 import com.pixelforge.app.video.AudioMode
@@ -59,7 +60,11 @@ fun CameraScreen(
     viewModel: CameraViewModel,
     uiState: CameraUiState,
     diagnosticsState: DiagnosticsState,
+    editorUri: Uri?,
     onOpenDiagnostics: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onEditorDone: (Uri) -> Unit = {},
+    onEditorCancel: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -80,7 +85,14 @@ fun CameraScreen(
     }
 
     PixelForgeTheme {
-        Scaffold(
+        if (editorUri != null) {
+            PhotoEditorScreen(
+                viewModel = viewModel.getEditorViewModel(),
+                onDone = onEditorDone,
+                onCancel = onEditorCancel,
+            )
+        } else {
+            Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text("PixelForge") },
@@ -91,6 +103,9 @@ fun CameraScreen(
                     actions = {
                         OutlinedButton(onClick = onOpenDiagnostics) {
                             Text("Diagnostics")
+                        }
+                        OutlinedButton(onClick = onOpenSettings) {
+                            Text("Settings")
                         }
                         // Share last enhanced video if available
                         uiState.lastVideoUri?.let { uri ->

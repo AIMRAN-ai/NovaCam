@@ -82,7 +82,11 @@ class TfliteModelRunner(
 
     private fun tryCreateGpu(): GpuDelegate? =
         try {
-            GpuDelegate()
+            GpuDelegate(
+                GpuDelegate.Options()
+                    .setInferencePreference(GpuDelegate.Options.INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER)
+                    .setPrecisionLossAllowed(true)
+            )
         } catch (e: Exception) {
             null
         }

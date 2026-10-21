@@ -23,8 +23,10 @@ import com.pixelforge.app.camera.RawVideoController
 import com.pixelforge.app.camera.ReferenceFrameSink
 import com.pixelforge.app.diagnostics.BurstDiagnostics
 import com.pixelforge.app.diagnostics.Diagnostics
+import com.pixelforge.app.edit.PhotoEditorViewModel
 import com.pixelforge.app.io.MediaStoreSaver
 import com.pixelforge.app.ml.PreviewEnhancer
+import com.pixelforge.app.settings.SettingsManager
 import com.pixelforge.app.video.HdrVideoCaptureController
 import com.pixelforge.app.video.VideoCaptureController
 import com.pixelforge.app.video.VideoEnhancementWorker
@@ -42,6 +44,7 @@ import java.util.Locale
 
 class CameraViewModel(
     private val app: PixelForgeApp,
+    private val settingsManager: SettingsManager,
 ) : ViewModel() {
 
     private val diagnostics: Diagnostics = app.diagnostics
@@ -75,10 +78,36 @@ class CameraViewModel(
         saver = saver,
     )
 
-    private val _uiState = MutableStateFlow(CameraUiState())
+    private val _uiState = MutableStateFlow(CameraUiState(
+        captureMode = parseCaptureMode(settingsManager.getDefaultCaptureMode()),
+        qualityTier = parseQualityTier(settingsManager.getDefaultQualityTier()),
+        videoQualityTier = parseVideoQualityTier(settingsManager.getDefaultVideoQuality()),
+    ))
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
 
     val diagnosticsState = diagnostics.state
+    
+    private val _editorUri = MutableStateFlow<Uri?>(null)
+    val editorUri: StateFlow<Uri?> = _editorUri.asStateFlow()
+    
+    private var editorViewModel: PhotoEditorViewModel? = null
+    
+    fun getEditorViewModel(): PhotoEditorViewModel {
+        if (editorViewModel == null) {
+            editorViewModel = PhotoEditorViewModel(app)
+        }
+        return editorViewModel!!
+    }
+    
+    fun openEditor(uri: Uri) {
+        _editorUri.value = uri
+        getEditorViewModel().loadImage(uri)
+    }
+    
+    fun closeEditor() {
+        _editorUri.value = null
+        editorViewModel = null
+    }
 
     private var halCapabilities: HalCapabilities? = null
 
@@ -389,6 +418,8 @@ class CameraViewModel(
                         lastError = null,
                     )
                 }
+                // Open editor with the captured image (prefer enhanced if available, otherwise saved)
+                savedUri?.let { openEditor(it) }
                 if (state.srEnabled && burstBytes.isNotEmpty()) {
                     launchSrPipeline(burstBytes, state.qualityTier, state.srScale)
                 }
@@ -438,6 +469,8 @@ class CameraViewModel(
                     _uiState.update {
                         it.copy(lastEnhancedUri = uri)
                     }
+                    // Update editor with enhanced image if editor is open
+                    _editorUri.value?.let { openEditor(uri) }
                 }
             } catch (e: Exception) {
                 _uiState.update {
@@ -498,6 +531,35 @@ class CameraViewModel(
         app.esrgan.release()
         app.previewEnhancerLite.release()
         app.dualCameraFusion.release()
+    }
+    
+    private fun parseCaptureMode(mode: String): CaptureMode {
+        return when (mode) {
+            "RAW_DNG" -> CaptureMode.RAW_DNG
+            "RAW_VIDEO" -> CaptureMode.RAW_VIDEO
+            else -> CaptureMode.BURST_YUV
+        }
+    }
+    
+    private fun parseQualityTier(tier: String): QualityTier {
+        return when (tier) {
+            "FAST" -> QualityTier.FAST
+            "QUALITY" -> QualityTier.QUALITY
+            else -> QualityTier.BALANCED
+        }
+    }
+    
+    private fun parseVideoQualityTier(tier: String): VideoQualityTier {
+        return when (tier) {
+            "ORIGINAL" -> VideoQualityTier.ORIGINAL
+            "ENHANCED_4K" -> VideoQualityTier.ENHANCED_4K
+            "SMOOTH_60FPS" -> VideoQualityTier.SMOOTH_60FPS
+            "SMOOTH_120FPS" -> VideoQualityTier.SMOOTH_120FPS
+            "HDR_1080P" -> VideoQualityTier.HDR_1080P
+            "HDR_4K" -> VideoQualityTier.HDR_4K
+            "HDR_SMOOTH_60FPS" -> VideoQualityTier.HDR_SMOOTH_60FPS
+            else -> VideoQualityTier.ENHANCED_1080P
+        }
     }
 
     companion object {
